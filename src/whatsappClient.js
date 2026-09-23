@@ -9,12 +9,14 @@ import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion
 } from "@whiskeysockets/baileys";
-import qrcode from "qrcode-terminal";
+import qrcodeTerminal from "qrcode-terminal";
+import QRCode from "qrcode";
 import pino from "pino";
 import fs from "fs";
 import { BotEngine } from "./botEngine.js";
 
 export let latestQR = null;
+export let latestQRDataURL = null;
 export let isConnected = false;
 
 export async function startWhatsAppClient() {
@@ -33,21 +35,28 @@ export async function startWhatsAppClient() {
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", (update) => {
+  sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
       latestQR = qr;
+      try {
+        latestQRDataURL = await QRCode.toDataURL(qr, { width: 300, margin: 2 });
+      } catch (err) {
+        console.error("❌ [QRCode Error] No se pudo convertir a DataURL:", err);
+      }
+
       console.log("\n=======================================================");
       console.log("📲 ESCANEA EL CÓDIGO QR EN TU TELÉFONO:");
       console.log("👉 O abre en tu navegador: http://localhost:3000/qr");
       console.log("=======================================================\n");
-      qrcode.generate(qr, { small: true });
+      qrcodeTerminal.generate(qr, { small: true });
     }
 
     if (connection === "close") {
       isConnected = false;
       latestQR = null;
+      latestQRDataURL = null;
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       
       // Error 401: Sesión cerrada desde el teléfono o credenciales expiradas
@@ -68,6 +77,7 @@ export async function startWhatsAppClient() {
     } else if (connection === "open") {
       isConnected = true;
       latestQR = null;
+      latestQRDataURL = null;
       console.log("\n🟢 [WhatsApp] ¡CONECTADO CON ÉXITO! El bot de citas está activo y listo para responder.\n");
     }
   });

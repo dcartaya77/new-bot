@@ -16,12 +16,13 @@ async function bootstrap() {
   console.log("🚀 INICIANDO BOT DE CALIFICACIÓN Y AGENDAMIENTO");
   console.log("=================================================");
 
-  // 1. Iniciar Servidor Express (API de prueba y Webhook)
+  // 1. Iniciar Servidor Express (API de citas, webhooks y visualizador QR)
   const app = createExpressServer();
   app.listen(PORT, () => {
-    console.log(`🌐 [Express API] Corriendo en http://localhost:${PORT}`);
-    console.log(`👉 Endpoint de prueba HTTP: POST http://localhost:${PORT}/api/chat`);
-    console.log(`👉 Endpoint de leads:       GET  http://localhost:${PORT}/api/leads`);
+    console.log(`🌐 [Express Server] Corriendo en puerto ${PORT}`);
+    console.log(`👉 Escanea el QR aquí:        http://localhost:${PORT}/qr`);
+    console.log(`👉 Estado y citas:            http://localhost:${PORT}/api/health`);
+    console.log(`👉 Endpoint de prueba chat:   POST http://localhost:${PORT}/api/chat`);
   });
 
   // 2. Iniciar Cliente de WhatsApp
