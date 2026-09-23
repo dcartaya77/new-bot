@@ -1,0 +1,23 @@
+{
+  "name": "whatsapp-lead-bot",
+  "version": "1.0.0",
+  "description": "Bot de calificación de leads y agendamiento automático para WhatsApp",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "simulate": "node src/simulate.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.12",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "pino": "^9.4.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}
