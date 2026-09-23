@@ -1,7 +1,7 @@
 {
-  "name": "whatsapp-lead-bot",
+  "name": "whatsapp-beauty-salon-bot",
   "version": "1.0.0",
-  "description": "Bot de calificación de leads y agendamiento automático para WhatsApp",
+  "description": "Bot de WhatsApp para agendamiento de citas y atención al cliente en salón de belleza (cejas y pestañas)",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
