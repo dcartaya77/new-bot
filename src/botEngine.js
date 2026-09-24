@@ -8,6 +8,7 @@ import { salonConfig } from "./config.js";
 import { stateManager } from "./stateManager.js";
 import { calendarService } from "./calendarService.js";
 import { notifyLead } from "./notifier.js";
+import { askSalonAI } from "./aiService.js";
 
 export class BotEngine {
   /**
@@ -37,6 +38,42 @@ export class BotEngine {
     }
 
     const session = stateManager.getOrCreate(userId);
+
+    // Detectar si el usuario está haciendo una pregunta sobre servicios, precios o fotos
+    const isQuestionOrInquiry =
+      text.includes("?") ||
+      [
+        "que es", "qué es", "como es", "cómo es", "en que consiste", "en qué consiste",
+        "para que", "para qué", "precio", "precios", "cuanto", "cuánto", "cuesta", "costo", "vale",
+        "lifting", "henna", "pestaña", "pestañas", "pestana", "pestanas",
+        "microblading", "micropigmentacion", "micropigmentación", "ceja", "cejas",
+        "foto", "fotos", "imagen", "imagenes", "imágenes", "duele", "dolor",
+        "dura", "duracion", "duración", "cuidados", "diferencia"
+      ].some((w) => cleanLower.includes(w));
+
+    // Si el usuario hace una pregunta sobre tratamientos, responder con IA o base de conocimiento
+    if (isQuestionOrInquiry) {
+      const aiResponse = await askSalonAI(text, { clientName: session.name });
+
+      // Generar recordatorio contextual según la fase actual
+      let reminder = "";
+      if (session.step === "AWAITING_NAME") {
+        reminder = `\n\n✨ ¿Te gustaría agendar una cita? ¿Con quién tengo el gusto de hablar? *(Por favor escribe tu Nombre y Apellido)*`;
+      } else if (session.step === "AWAITING_SERVICE") {
+        reminder = `\n\n👉 *Para agendar tu cita*, responde con el número del servicio preferido:\n` +
+          `1️⃣ Henna | 2️⃣ Extensiones | 3️⃣ Lash Lifting | 4️⃣ Microblading\n` +
+          `_(o escribe *menu* para ver la lista completa con precios)_`;
+      } else if (session.step === "AWAITING_DATE") {
+        reminder = `\n\n📅 Recuerda indicarnos qué fecha prefieres para tu cita (ej: *25/09* o *26/09*):`;
+      } else if (session.step === "AWAITING_TIME") {
+        reminder = `\n\n⏰ Por favor indícanos qué hora prefieres de las opciones disponibles:`;
+      }
+
+      return {
+        text: aiResponse.text + reminder,
+        imagePath: aiResponse.imagePath
+      };
+    }
 
     // FASE 1: Captura del nombre del cliente
     if (session.step === "AWAITING_NAME") {

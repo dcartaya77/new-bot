@@ -5,6 +5,7 @@
  * Ejecuta este script con: npm run simulate
  */
 
+import "dotenv/config";
 import readline from "readline";
 import { BotEngine } from "./botEngine.js";
 
@@ -22,9 +23,20 @@ console.log("👉 Tip: Prueba pedir '25/09' a las '14:00' para ver el control de
 console.log("👉 Tip: Escribe 'admin resumen' en cualquier momento para ver la agenda.");
 console.log("=======================================================\n");
 
+function printBotReply(reply) {
+  if (typeof reply === "object" && reply !== null) {
+    console.log(`\n🤖 Bot:\n${reply.text}\n`);
+    if (reply.imagePath) {
+      console.log(`📸 [IMAGEN ADJUNTA DESPACHADA]: ${reply.imagePath}\n`);
+    }
+  } else {
+    console.log(`\n🤖 Bot:\n${reply}\n`);
+  }
+}
+
 async function startChat() {
   const initialReply = await BotEngine.processMessage(FAKE_USER_ID, "Hola");
-  console.log(`🤖 Bot:\n${initialReply}\n`);
+  printBotReply(initialReply);
   promptUser();
 }
 
@@ -36,7 +48,7 @@ function promptUser() {
     }
 
     const reply = await BotEngine.processMessage(FAKE_USER_ID, input);
-    console.log(`\n🤖 Bot:\n${reply}\n`);
+    printBotReply(reply);
     promptUser();
   });
 }

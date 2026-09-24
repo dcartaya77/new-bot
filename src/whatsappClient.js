@@ -112,8 +112,24 @@ export async function startWhatsAppClient() {
         await sock.sendPresenceUpdate("composing", remoteJid);
         await new Promise((r) => setTimeout(r, 1000));
 
-        const replyText = await BotEngine.processMessage(remoteJid, messageContent);
-        await sock.sendMessage(remoteJid, { text: replyText });
+        const reply = await BotEngine.processMessage(remoteJid, messageContent);
+
+        // Enviar respuesta en texto y/o fotografía si la IA lo solicitó
+        if (typeof reply === "object" && reply !== null) {
+          if (reply.text) {
+            await sock.sendMessage(remoteJid, { text: reply.text });
+          }
+          if (reply.imagePath && fs.existsSync(reply.imagePath)) {
+            await sock.sendMessage(remoteJid, {
+              image: fs.readFileSync(reply.imagePath),
+              caption: reply.caption || "✨ Muestra de nuestro trabajo en el estudio."
+            });
+            console.log(`📸 [Foto enviada a ${remoteJid}]: ${reply.imagePath}`);
+          }
+        } else {
+          await sock.sendMessage(remoteJid, { text: String(reply) });
+        }
+
         await sock.sendPresenceUpdate("available", remoteJid);
         console.log(`📤 [Respuesta enviada a ${remoteJid}]`);
       } catch (err) {
