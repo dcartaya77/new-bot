@@ -163,7 +163,7 @@ function getFallbackKnowledgeResponse(userMessage) {
 }
 
 /**
- * Procesa la consulta de una clienta usando Google Gemini
+ * Procesa la consulta de una clienta usando Google Gemini con reintentos automáticos
  * @param {string} userMessage - Mensaje o pregunta de la clienta
  * @param {object} options - Opciones adicionales (clientName, etc.)
  * @returns {Promise<{ text: string, imagePath: string|null, serviceId: string|null }>}
@@ -172,51 +172,76 @@ export async function askSalonAI(userMessage, options = {}) {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   const client = apiKey ? getClient() : null;
 
-  // Si no hay API KEY configurada o guardada, usar el motor de conocimiento local del salón
+  // Sin API KEY: usar base de conocimiento integrada del salón
   if (!client) {
-    console.log("ℹ️ [AI Service] GEMINI_API_KEY no detectada en .env. Usando base de conocimiento integrada.");
+    console.log("ℹ️ [AI Service] GEMINI_API_KEY no configurada. Usando base de conocimiento integrada.");
     return getFallbackKnowledgeResponse(userMessage);
   }
 
-  try {
-    const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-    const systemInstruction = buildSystemInstruction(options.clientName);
+  // Lista de modelos a intentar en orden (si uno da 503, se prueba el siguiente)
+  const primaryModel = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const modelFallbackChain = [
+    primaryModel,
+    "gemini-3.5-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash"
+  ].filter((v, i, arr) => arr.indexOf(v) === i); // eliminar duplicados
 
-    const response = await client.models.generateContent({
-      model: modelName,
-      contents: userMessage,
-      config: {
-        systemInstruction,
-        temperature: 0.7
+  const systemInstruction = buildSystemInstruction(options.clientName);
+
+  for (const modelName of modelFallbackChain) {
+    try {
+      const response = await client.models.generateContent({
+        model: modelName,
+        contents: userMessage,
+        config: {
+          systemInstruction,
+          temperature: 0.7
+        }
+      });
+
+      if (modelName !== primaryModel) {
+        console.log(`✅ [AI] Respondiendo con modelo alternativo: ${modelName}`);
       }
-    });
 
-    let rawReply = response.text || "";
-    let detectedServiceId = null;
-    let imagePath = null;
+      let rawReply = response.text || "";
+      let detectedServiceId = null;
+      let imagePath = null;
 
-    // Detectar si la IA solicitó enviar una fotografía
-    const photoMatch = rawReply.match(/\[FOTO:\s*([a-zA-Z0-9_]+)\]/i);
-    if (photoMatch) {
-      detectedServiceId = photoMatch[1].toLowerCase().trim();
-      rawReply = rawReply.replace(photoMatch[0], "").trim();
-      imagePath = findServiceImage(detectedServiceId);
+      // Detectar si la IA solicitó enviar una fotografía
+      const photoMatch = rawReply.match(/\[FOTO:\s*([a-zA-Z0-9_]+)\]/i);
+      if (photoMatch) {
+        detectedServiceId = photoMatch[1].toLowerCase().trim();
+        rawReply = rawReply.replace(photoMatch[0], "").trim();
+        imagePath = findServiceImage(detectedServiceId);
 
-      if (imagePath) {
-        console.log(`📸 [AI] Imagen adjunta detectada para servicio: ${detectedServiceId} (${imagePath})`);
-      } else {
-        console.log(`ℹ️ [AI] La IA solicitó foto para '${detectedServiceId}', pero no hay archivo en /assets/services/`);
+        if (imagePath) {
+          console.log(`📸 [AI] Imagen adjunta para servicio: ${detectedServiceId} (${imagePath})`);
+        } else {
+          console.log(`ℹ️ [AI] Sin imagen en /assets/services/ para '${detectedServiceId}'`);
+        }
       }
+
+      return { text: rawReply, imagePath, serviceId: detectedServiceId };
+
+    } catch (err) {
+      const errBody = err.message || "";
+      const is503 = errBody.includes("503") || errBody.includes("UNAVAILABLE") || errBody.includes("high demand");
+      const is404 = errBody.includes("404") || errBody.includes("NOT_FOUND") || errBody.includes("no longer available");
+
+      if (is503 || is404) {
+        console.warn(`⚠️ [AI] Modelo '${modelName}' no disponible (${is503 ? "503 saturado" : "404 retirado"}). Probando siguiente modelo...`);
+        continue; // intentar el siguiente en la cadena
+      }
+
+      // Error desconocido → usar base de conocimiento local
+      console.error("❌ [AI Error] Error inesperado al consultar Gemini:", errBody.slice(0, 120));
+      return getFallbackKnowledgeResponse(userMessage);
     }
-
-    return {
-      text: rawReply,
-      imagePath,
-      serviceId: detectedServiceId
-    };
-  } catch (err) {
-    console.error("❌ [AI Error] Error al consultar Google Gemini:", err.message);
-    // Si Gemini da error (por ejemplo, clave inválida o sin conexión), responder con el conocimiento local
-    return getFallbackKnowledgeResponse(userMessage);
   }
+
+  // Todos los modelos fallaron → respuesta de conocimiento integrado
+  console.warn("⚠️ [AI] Todos los modelos de Gemini están saturados. Usando base de conocimiento integrada.");
+  return getFallbackKnowledgeResponse(userMessage);
 }
+
